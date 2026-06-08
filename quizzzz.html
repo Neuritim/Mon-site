@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Football Quiz Pro</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+font-family:Segoe UI,sans-serif;
+background:linear-gradient(135deg,#0f172a,#1e293b);
+color:white;
+display:flex;
+justify-content:center;
+align-items:center;
+min-height:100vh;
+padding:20px;
+}
+
+.container{
+width:100%;
+max-width:800px;
+background:rgba(255,255,255,.08);
+border-radius:25px;
+padding:25px;
+box-shadow:0 10px 30px rgba(0,0,0,.5);
+}
+
+h1{font-size:32px;margin-bottom:20px;}
+
+.stats{display:flex;gap:10px;margin-bottom:20px;}
+
+.stat{
+flex:1;
+background:#111827;
+padding:15px;
+border-radius:15px;
+text-align:center;
+font-weight:bold;
+}
+
+.bar{
+height:20px;
+background:#1f2937;
+border-radius:20px;
+overflow:hidden;
+margin-bottom:10px;
+}
+
+.progress{
+height:100%;
+width:0%;
+background:linear-gradient(90deg,#22c55e,#4ade80);
+}
+
+#timerBar{
+height:100%;
+width:100%;
+background:linear-gradient(90deg,#ef4444,#f59e0b);
+transition:width 1s linear;
+}
+
+#question{
+background:#111827;
+padding:20px;
+border-radius:15px;
+margin-bottom:15px;
+font-size:22px;
+}
+
+button{
+width:100%;
+padding:14px;
+margin:6px 0;
+border:none;
+border-radius:15px;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+}
+
+.answer{background:#2563eb;color:white;}
+.shop{background:#f59e0b;color:white;}
+
+#message{
+margin:10px 0;
+text-align:center;
+font-weight:bold;
+font-size:18px;
+}
+
+#scoreBoard{
+margin-top:15px;
+padding:15px;
+background:#111827;
+border-radius:15px;
+display:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>⚽ Football Quiz Pro</h1>
+
+<div class="stats">
+<div class="stat">🏆 Niveau<br><span id="level">1</span></div>
+<div class="stat">⭐ XP<br><span id="xp">0</span></div>
+<div class="stat">🪙 Pièces<br><span id="coins">100</span></div>
+<div class="stat">🎯 Score<br><span id="score">0</span></div>
+</div>
+
+<div class="bar"><div class="progress" id="progress"></div></div>
+<div class="bar"><div id="timerBar"></div></div>
+
+<div id="message"></div>
+
+<h2 id="question">Chargement...</h2>
+<div id="answers"></div>
+
+<button class="shop" onclick="buyHint()">💡 Indice (50)</button>
+<button class="shop" onclick="skipQuestion()">⏭ Passer (100)</button>
+<button class="shop" onclick="buyDoubleXP()">⭐ Double XP</button>
+
+<div id="scoreBoard"></div>
+
+</div>
+
+<script>
+
+/* 🔊 SONS */
+let soundGood = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+let soundBad = new Audio("https://actions.google.com/sounds/v1/cartoon/boing.ogg");
+
+/* PLAYER */
+let player = JSON.parse(localStorage.getItem("quizSave")) || {
+level:1,xp:0,coins:100,score:0
+};
+
+let current = 0;
+let doubleXP = false;
+let timeLeft = 15;
+let timer = null;
+
+/* 🎯 IMPORTANT : progression niveau */
+let questionsDone = 0;
+
+const questions = [
+{q:"Qui a remporté la Coupe du Monde 2022 ?",a:["France","Argentine","Brésil","Croatie"],c:1},
+{q:"Qui a remporté la Coupe du Monde 2018 ?",a:["France","Croatie","Belgique","Brésil"],c:0},
+{q:"Quel pays a remporté le plus de Coupes du Monde ?",a:["Brésil","Italie","Allemagne","Argentine"],c:0},
+{q:"Qui est le meilleur buteur de la Coupe du Monde ?",a:["Pelé","Messi","Ronaldo","Klose"],c:3},
+{q:"Quel pays a accueilli la Coupe du Monde 2022 ?",a:["Qatar","Russie","Brésil","USA"],c:0}
+];
+
+/* SAVE */
+function saveGame(){
+localStorage.setItem("quizSave",JSON.stringify(player));
+}
+
+/* UI */
+function updateUI(){
+document.getElementById("level").textContent=player.level;
+document.getElementById("xp").textContent=player.xp;
+document.getElementById("coins").textContent=player.coins;
+document.getElementById("score").textContent=player.score;
+document.getElementById("progress").style.width=(player.xp%100)+"%";
+}
+
+/* TIMER */
+function startTimer(){
+clearInterval(timer);
+timeLeft=15;
+document.getElementById("timerBar").style.width="100%";
+
+timer=setInterval(()=>{
+timeLeft--;
+document.getElementById("timerBar").style.width=(timeLeft/15)*100+"%";
+
+if(timeLeft<=0){
+clearInterval(timer);
+showMessage("⏱️ Temps écoulé !");
+player.score-=5;
+current++;
+loadQuestion();
+}
+},1000);
+}
+
+/* QUESTION */
+function loadQuestion(){
+
+if(current>=questions.length){
+endGame();
+return;
+}
+
+let q=questions[current];
+document.getElementById("question").textContent=q.q;
+
+let box=document.getElementById("answers");
+box.innerHTML="";
+
+q.a.forEach((ans,i)=>{
+let b=document.createElement("button");
+b.className="answer";
+b.textContent=ans;
+b.onclick=()=>checkAnswer(i);
+box.appendChild(b);
+});
+
+startTimer();
+}
+
+/* MESSAGE */
+function showMessage(t){
+document.getElementById("message").textContent=t;
+}
+
+/* CHECK ANSWER */
+function checkAnswer(i){
+
+clearInterval(timer);
+
+let q=questions[current];
+
+if(i===q.c){
+
+soundGood.play();
+
+player.xp+=20;
+player.coins+=25;
+player.score+=10;
+
+showMessage("✅ Bonne réponse");
+
+/* 🎯 logique niveau */
+questionsDone++;
+
+if(questionsDone >= player.level){
+player.level++;
+questionsDone=0;
+showMessage("🚀 Niveau supérieur !");
+}
+
+}else{
+
+soundBad.play();
+player.score-=5;
+showMessage("❌ Mauvaise réponse");
+
+}
+
+current++;
+saveGame();
+updateUI();
+loadQuestion();
+}
+
+/* BONUS */
+function buyHint(){
+if(player.coins<50)return showMessage("Pas assez !");
+player.coins-=50;
+showMessage("💡 Bonne réponse : "+(questions[current].c+1));
+saveGame();updateUI();
+}
+
+function skipQuestion(){
+if(player.coins<100)return showMessage("Pas assez !");
+player.coins-=100;
+current++;
+saveGame();updateUI();
+loadQuestion();
+}
+
+function buyDoubleXP(){
+if(player.coins<200)return showMessage("Pas assez !");
+player.coins-=200;
+doubleXP=true;
+showMessage("⭐ Double XP activé !");
+saveGame();updateUI();
+}
+
+/* FIN */
+function endGame(){
+document.getElementById("question").textContent="🏆 Quiz terminé !";
+document.getElementById("answers").innerHTML="";
+document.getElementById("timerBar").style.width="0%";
+
+document.getElementById("scoreBoard").style.display="block";
+document.getElementById("scoreBoard").innerHTML=
+"🏆 Score final : "+player.score;
+}
+
+window.onload=()=>{
+updateUI();
+loadQuestion();
+};
+
+</script>
+
+</body>
+</html>
